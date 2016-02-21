@@ -21,6 +21,23 @@ var server = http.createServer(router);
 var io = socketio.listen(server);
 
 router.use(express.static(path.resolve(__dirname, 'client')));
+
+/*
+Flujos
+
+Nueva sesión
+on('new') -> emmit('token') -> on('deals') x2 -> emmit('state') [waiting other person, joined]
+
+Unirse a sesión
+on('join') -> emmit('state') [joined, 404]
+
+Game
+( on('choice') -> emmit('state') [day, game over] ) x 7
+
+Finish
+emmit('results') -> on('replay')
+
+*/
 var messages = [];
 var sockets = [];
 
@@ -38,12 +55,11 @@ io.on('connection', function (socket) {
 
     socket.on('message', function (msg) {
       try {
-        msg = JSON.parse(msg); 
+        msg = JSON.parse(msg);
       } catch(e) {
         return;
       }
-      if (!msg)
-        return;
+      if (!msg) { return; }
 
       socket.get('name', function (err, name) {
         var data = {
