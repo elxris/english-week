@@ -1,0 +1,11 @@
+body{
+  background-color: black;
+  text-align: center;
+  vertical-align: middle;
+  margin: 10%;
+}
+
+h1, h2, h3, h4, h5, h6{
+  color: white;
+  font-family: 'Roboto', sans-serif;
+}
