@@ -43,7 +43,7 @@ var genToken = function() {
 
 io.on('connection', function(socket) {
   console.log('connection');
-  socket.on('new', function(){
+  var newGame = function() {
     var token = genToken();
     while(sessions[token]) {
       token = genToken();
@@ -66,7 +66,8 @@ io.on('connection', function(socket) {
     setTimeout(function() {
       delete sessions[token];
     }, 1000*60*15);
-  });
+  };
+  socket.on('new', newGame);
   socket.on('deal', function(deal) {
       var session = socket.session;
       if (!session) {
@@ -79,13 +80,20 @@ io.on('connection', function(socket) {
         return;
       }
       if (session.status == 'deal' && session.victim == socket) {
+        if (session.deals.host == deal) {
+          socket.emit('message', 'This deal is already selected');
+          socket.emit('status', 'deal');
+          return;
+        }
         session.deals.victim = deal;
         session.status = 'start';
         session.host.emit('status', session.status);
         socket.emit('status', session.status);
+        socket.emit('rewards', [session.deals.host, session.deals.victim]);
+        session.host.emit('rewards', [session.deals.host, session.deals.victim]);
         return;
       }
-      socket.emit('message', 'Error en deal');
+      socket.emit('message', 'Error on deal');
   });
   socket.on('join', function(token) {
     var session = sessions[token];
@@ -103,6 +111,7 @@ io.on('connection', function(socket) {
       return;
     }
     socket.emit('status', '404');
+    newGame();
   });
   socket.on('choice', function(choice) {
     var session = socket.session;
@@ -123,17 +132,28 @@ io.on('connection', function(socket) {
     }
 
     if ((me.length - other.length) > 0) {
-      socket.emit('message', 'Necesitas esperar al otro jugador.');
+      socket.emit('message', 'You need to wait the other player.');
+      return;
+    }
+    if (me.length >= 7) {
       return;
     }
     me.push(choice);
-
     if (me.length == other.length && me.length == 7) {
-      socket.emit('results', session.choices);
+      var results = [0, 0];
+      for(var i = 0; i < 7; i++) {
+        if (session.choices.host[i] == session.choices.victim[i]) {
+          results[0]++;
+          continue;
+        }
+        results[1]++;
+      }
+      session.host.emit('results', results);
+      session.victim.emit('results', results);
       return;
     }
 
-    session[_role].emit('day', me.length);
+    session[_role].emit('day', other.length);
   });
 
   socket.on('replay', function() {
@@ -153,7 +173,7 @@ io.on('connection', function(socket) {
   });
 });
 
-server.listen(process.env.PORT || 3000, process.env.IP || "0.0.0.0", function(){
+server.listen(process.env.PORT || 8080, process.env.IP || "0.0.0.0", function(){
   var addr = server.address();
   console.log("Chat server listening at", addr.address + ":" + addr.port);
 });

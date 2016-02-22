@@ -18,16 +18,26 @@
     <h2>Welcome</h2>
     <h5>to</h5>
 
-    <img src="img/britishflag.png" class="img-responsive"/>
+    <img src="img/Flag.gif" class="img-responsive"/>
 
     <h1>English Weekend</h1>
 
-    <button data-toggle="modal" data-target="#dialogTurn">Play</button>
+    <button class="btn btn-default" data-toggle="modal" data-target="#dialogTurn">Play</button>
 
   </div>
 
   <div id="contentGame" hidden>
-    Started ...
+    <h3>DEALS IN THIS MATCH</h3>
+    <div id="rewardscontent" class="container"></div>
+
+    <p id="dayofweek">MONDAY</p>
+
+    <div class="container">
+      <img class="fake_img_arrow" onclick="socket.emit('choice',false)" src="/img/leftcirculararrow.png"/>
+      <img class="fake_img_arrow" onclick="socket.emit('choice',true)" src="/img/rightcirculararrow.png"/>
+    </div>
+    <img id="imgShakePhone" src="/img/shake.gif"/>
+
   </div>
 
   <div class="modal fade" tabindex="-1" role="dialog" id="dialogTurn">
@@ -35,15 +45,46 @@
       <div class="modal-content">
         <p style="color: black; margin-top:10px">Choose a deal&hellip;</p>
 
-        <img id="imgKiss" alt="dealKiss" onclick="sendDeal('kiss');"/>
+        <img id="imgFirstBase" alt="first base" onclick="sendDeal('Kiss');" src="/img/Kiss.gif"/>
 
-        <img id="imgSlap" alt="dealSlap" onclick="sendDeal('slap');"/>
+        <img id="imgFirstBase" alt="first base" onclick="sendDeal('lick');" src="/img/lick.gif"/>
+
+        <!--<img id="imgSecondBase" alt="second base" onclick="sendDeal('secondbase');" src=""/>-->
+
+        <!--<img id="imgBite" alt="bite" onclick="sendDeal('bite');" src=""/>-->
+
+        <img id="imgSlap" alt="slap" onclick="sendDeal('Slap');" src="/img/Slap.gif"/>
 
       </div>
 
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
         <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#modalRules">Rules</button>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="modal fade" tabindex="-1" role="dialog" id="dialogResult">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <p style="color: black; margin-top:10px">RESULT OF THIS MATCH&hellip;</p>
+
+        <div class="container">
+            <div class="container containerDivResults">
+              <img id="imgFirstDeal" alt="first deal" src="" class="img_dialog_size"/>
+              <h1 id="numberDealsOne"></h1>
+            </div>
+
+            <div class="container containerDivResults">
+              <img id="imgSecondDeal" alt="second deal" src="" class="img_dialog_size"/>
+              <h1 id="numberDealsTwo"></h1>
+            </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button onclick="socket.emit('replay',true)" type="button" class="btn btn-primary" data-dismiss="modal">Again</button>
       </div>
 
     </div>
@@ -69,6 +110,7 @@
   <div class="modal fade" tabindex="-1" role="dialog" id="modalWaitForDeal">
     <div class="modal-dialog">
       <div class="modal-content">
+        <img id="imgWaiting" alt="waiting" src="/img/Wait.gif"/>
         <p style="color: black; margin-top:10px">Waiting for deal of other player&hellip;</p>
       </div>
     </div>
@@ -96,6 +138,9 @@
     var token = window.location.pathname.substr(1);
 
     var socket = io.connect();
+    var indexGame = 0;
+    var days = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+    var rew;
 
     if (token) {
       socket.emit('join', token);
@@ -109,29 +154,34 @@
 
     });
 
+    socket.on('rewards', function(rewards) {
+      rew = rewards;
+      document.getElementById('rewardscontent').innerHTML = "<img class=\"fake_img\" alt=\"" + rewards[0] + "\" src=\"/img/" + rewards[0] + ".gif\">" + "<img class=\"fake_img\" alt=\"" + rewards[1] + "\" src=\"/img/" + rewards[1] + ".gif\">";
+      starGame();
+    });
+
     socket.on('status', function(status) {
         switch (status) {
           case 'initialized':
-              document.getElementById("welcomeDiv").style.visibility = "visible";
-              document.getElementById("contentGame").style.visibility = "hidden";
+              document.getElementById("welcomeDiv").style.display = "block";
+              document.getElementById("contentGame").style.display = "none";
             break;
           case 'start':
             // Inicia juego
-            alert("start game")
-              document.getElementById("welcomeDiv").style.visibility = "hidden";
-              document.getElementById("contentGame").style.visibility = "visible";
+              document.getElementById("welcomeDiv").style.display = "none";
+              document.getElementById("contentGame").style.display = "block";
               $("#dialogWait").modal('hide');
               $("#dialogTurn").modal('hide');
-              $('#modalWaitForDeal').modal('hide')
+              $('#modalWaitForDeal').modal('hide');
             break;
           case 'waiting':
             // mostrar mensaje de espera
             $("#dialogWait").modal('hide');
-            $("#modalWaitForDeal").modal('show');
+            $("#modalWaitForDeal").modal({backdrop: 'static', keyboard: false});
             break;
           case 'token':
               // mostrar modal con token
-              $('#dialogWait').modal('show');
+              $('#dialogWait').modal({backdrop: 'static', keyboard: false});
               break;
           case 'deal':
               //mostrar modal de seleccionar deal
@@ -139,11 +189,11 @@
               break;
           case 'results':
             // mostrar mensaje de espera
-            $("#dialogResults").modal('show');
+            $("#dialogResult").modal('show');
             break;
           case '404':
-              document.getElementById("welcomeDiv").style.visibility = "visible";
-              document.getElementById("contentGame").style.visibility = "hidden";
+              document.getElementById("welcomeDiv").style.display = "block";
+              document.getElementById("contentGame").style.display = "none";
               getNewToken();
             break;
           default:
@@ -151,13 +201,28 @@
         }
     });
 
+    socket.on('day', function(day) {
+        indexGame = day;
+        document.getElementById('dayofweek').innerHTML = days[indexGame];
+    });
+
+    socket.on('results', function(results) {
+        // results -> [3, 4];
+        document.getElementById('numberDealsOne').innerHTML = results[0];
+        document.getElementById('numberDealsTwo').innerHTML = results[1];
+        $("#dialogResult").modal('show');
+        document.getElementById("contentGame").style.display = "none";
+        document.getElementById('imgFirstDeal').src = "/img/" + rewards[0] + ".gif";
+        document.getElementById('imgSecondDeal').src = "/img/" + rewards[1] + ".gif";
+    });
+
     function getNewToken(){
       socket.emit("new", true)
     };
 
     function sendDeal(deal) {
-      socket.emit('deal', deal)
       $("#dialogTurn").modal('hide');
+      socket.emit('deal', deal);
     }
 
     function movement(day, side) {
@@ -171,6 +236,74 @@
     socket.on('message', function(message) {
         alert(message);
     });
+
+    function starGame(){
+
+      if (!window.DeviceMotionEvent) {
+        alert("no accelerometer");
+      } else {
+        var axisY;
+        var axisX;
+        var axisZ;
+        // var interval = 0;
+        // var indexGame = 0;
+        var system = getMobileOperatingSystem();
+
+        var ward = false;
+
+        function accelerometerUpdate(event) {
+          if (!axisX) {
+            console.log(JSON.stringify(event));
+          }
+          axisX = event.accelerationIncludingGravity.x;
+          axisY = event.accelerationIncludingGravity.y;
+          axisZ = event.accelerationIncludingGravity.z;
+          if (!system) {
+            axisX = -axisX;
+            axisY = -axisY;
+            axisZ = -axisZ;
+          }
+          if (Math.abs(axisX) > 6 && !ward) {
+            socket.emit('choice', axisX > 0);
+            if (indexGame >= 6) {
+              window.removeEventListener('devicemotion', accelerometerUpdate);
+            }
+            ward = true;
+            if(indexGame <= 7) {
+              // document.getElementById('dayofweek').innerHTML = days[indexGame++];
+              document.getElementById('dayofweek').innerHTML = 'Waiting ...';
+            }
+          }
+          if (Math.abs(axisX) < 3 && ward) {
+            ward = false;
+          }
+        }
+
+        window.addEventListener("devicemotion", accelerometerUpdate, true);
+
+
+      }
+
+      function getMobileOperatingSystem() {
+        var userAgent = navigator.userAgent || navigator.vendor || window.opera;
+
+        if( userAgent.match( /iPad/i ) || userAgent.match( /iPhone/i ) || userAgent.match( /iPod/i ) )
+        {
+          return true;
+
+        }
+        else if( userAgent.match( /Android/i ) )
+        {
+
+          return false;
+        }
+        else
+        {
+          return false;
+        }
+      }
+
+          }
 
   </script>
 </body>
