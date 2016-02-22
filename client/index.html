@@ -73,12 +73,12 @@
         <div class="container">
             <div class="container containerDivResults">
               <img id="imgFirstDeal" alt="first deal" src="" class="img_dialog_size"/>
-              <h1 id="numberDealsOne"></h1>
+              <h1 id="numberDealsOne" style="color:black;"></h1>
             </div>
 
             <div class="container containerDivResults">
               <img id="imgSecondDeal" alt="second deal" src="" class="img_dialog_size"/>
-              <h1 id="numberDealsTwo"></h1>
+              <h1 id="numberDealsTwo" style="color:black;"></h1>
             </div>
         </div>
       </div>
@@ -210,10 +210,10 @@
         // results -> [3, 4];
         document.getElementById('numberDealsOne').innerHTML = results[0];
         document.getElementById('numberDealsTwo').innerHTML = results[1];
-        $("#dialogResult").modal('show');
+        $("#dialogResult").modal({backdrop: 'static', keyboard: false});
         document.getElementById("contentGame").style.display = "none";
-        document.getElementById('imgFirstDeal').src = "/img/" + rewards[0] + ".gif";
-        document.getElementById('imgSecondDeal').src = "/img/" + rewards[1] + ".gif";
+        document.getElementById('imgFirstDeal').src = "/img/" + rew[0] + ".gif";
+        document.getElementById('imgSecondDeal').src = "/img/" + rew[1] + ".gif";
     });
 
     function getNewToken(){
