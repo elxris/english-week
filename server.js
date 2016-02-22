@@ -1,101 +1,157 @@
-//
-// # SimpleServer
-//
-// A simple chat server using Socket.IO, Express, and Async.
-//
-var http = require('http');
-var path = require('path');
+'use strickt';
 
-var async = require('async');
+var http = require('http');
+var path = require("path");
+
 var socketio = require('socket.io');
 var express = require('express');
 
-//
-// ## SimpleServer `SimpleServer(obj)`
-//
-// Creates a new instance of SimpleServer with the following options:
-//  * `port` - The HTTP port to listen on. If `process.env.PORT` is set, _it overrides this value_.
-//
 var router = express();
 var server = http.createServer(router);
 var io = socketio.listen(server);
 
 router.use(express.static(path.resolve(__dirname, 'client')));
+router.get('/:id', function(req, res, next) {
+  res.sendFile(__dirname + '/client/index.html');
+});
 
 /*
 Flujos
 
 Nueva sesión
-on('new') -> emmit('token') -> on('deals') x2 -> emmit('state') [waiting other person, joined]
+on('new') -> emit('token') -> on('deals') x2 -> emit('state') [waiting other person, joined]
 
 Unirse a sesión
-on('join') -> emmit('state') [joined, 404]
+on('join') -> emit('state') [joined, 404]
 
 Game
-( on('choice') -> emmit('state') [day, game over] ) x 7
+( on('choice') -> emit('state') [day, game over] ) x 7
 
 Finish
-emmit('results') -> on('replay')
+emit('results') -> on('replay')
 
 */
-var messages = [];
-var sockets = [];
 
-io.on('connection', function (socket) {
-    messages.forEach(function (data) {
-      socket.emit('message', data);
-    });
+var sessions = {};
 
-    sockets.push(socket);
+var genToken = function() {
+  var min = 0x1000;
+  var max = 0xffff;
+  var random = Math.floor(Math.random()*(max - min) + min);
+  return random.toString(16);
+}
 
-    socket.on('disconnect', function () {
-      sockets.splice(sockets.indexOf(socket), 1);
-      updateRoster();
-    });
-
-    socket.on('message', function (msg) {
-      try {
-        msg = JSON.parse(msg);
-      } catch(e) {
+io.on('connection', function(socket) {
+  console.log('connection');
+  socket.on('new', function(){
+    var token = genToken();
+    while(sessions[token]) {
+      token = genToken();
+    }
+    socket.token = token;
+    sessions[token] = {
+      host: socket,
+      victim: undefined,
+      status: 'initialized',
+      deals: {
+        host: undefined,
+        victim: undefined
+      },
+      choices: {
+        host: [], victim: []
+      }
+    };
+    socket.session = sessions[token];
+    socket.emit('token', token);
+    setTimeout(function() {
+      delete sessions[token];
+    }, 1000*60*15);
+  });
+  socket.on('deal', function(deal) {
+      var session = socket.session;
+      if (!session) {
         return;
       }
-      if (!msg) { return; }
-
-      socket.get('name', function (err, name) {
-        var data = {
-          name: name,
-          text: ''
-        };
-
-        broadcast('message', data);
-        messages.push(data);
-      });
-    });
-
-    socket.on('identify', function (name) {
-      socket.set('name', String(name || 'Anonymous'), function (err) {
-        updateRoster();
-      });
-    });
+      if (session.status == 'initialized' && session.host == socket) {
+        session.deals.host = deal;
+        session.status = 'waiting';
+        socket.emit('status', 'token');
+        return;
+      }
+      if (session.status == 'deal' && session.victim == socket) {
+        session.deals.victim = deal;
+        session.status = 'start';
+        session.host.emit('status', session.status);
+        socket.emit('status', session.status);
+        return;
+      }
+      socket.emit('message', 'Error en deal');
   });
-
-function updateRoster() {
-  async.map(
-    sockets,
-    function (socket, callback) {
-      socket.get('name', callback);
-    },
-    function (err, names) {
-      broadcast('roster', names);
+  socket.on('join', function(token) {
+    var session = sessions[token];
+    if (!session) {
+       return;
     }
-  );
-}
-
-function broadcast(event, data) {
-  sockets.forEach(function (socket) {
-    socket.emit(event, data);
+    if (session.status == 'waiting') {
+      session.status = 'deal'
+      session.victim = socket;
+      session.host.emit('status', 'waiting');
+      socket.emit('status', session.status);
+      socket.token = token;
+      socket.session = session;
+      delete sessions[token];
+      return;
+    }
+    socket.emit('status', '404');
   });
-}
+  socket.on('choice', function(choice) {
+    var session = socket.session;
+    if (!session) {
+      return;
+    }
+    if (session.status != 'start') {
+      return;
+    }
+    var role = 'host';
+    var _role = 'victim';
+    var me = session.choices.host;
+    var other = session.choices.victim;
+    if (session.host != socket) {
+      role = 'victim'; _role = 'host';
+      me = session.choices.victim;
+      other = session.choices.host;
+    }
+
+    if ((me.length - other.length) > 0) {
+      socket.emit('message', 'Necesitas esperar al otro jugador.');
+      return;
+    }
+    me.push(choice);
+
+    if (me.length == other.length && me.length == 7) {
+      socket.emit('results', session.choices);
+      return;
+    }
+
+    session[_role].emit('day', me.length);
+  });
+
+  socket.on('replay', function() {
+      var session = socket.session;
+      if (!session) {
+        return;
+      }
+      if (session.host != socket) {
+        return;
+      }
+      session.choices = {host: [], victim:[]};
+      session.status = 'start';
+      session.host.emit(session.status);
+      session.victim.emit(session.status);
+  });
+  socket.on('disconnect', function() {
+  });
+});
 
 server.listen(process.env.PORT || 3000, process.env.IP || "0.0.0.0", function(){
   var addr = server.address();

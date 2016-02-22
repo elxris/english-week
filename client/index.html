@@ -4,29 +4,175 @@
 <head>
   <title>English Week</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="css/bootstrap.min.css">
-  <link rel="stylesheet" href="css/bootstrap-responsive.min.css">
+  <link rel="stylesheet" href="/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/bootstrap-responsive.min.css">
   <link href='https://fonts.googleapis.com/css?family=Roboto:400,300,500' rel='stylesheet' type='text/css'>
-  <link rel="stylesheet" href="css/main.css">
-  <script src="js/accelerometer.js"></script>
+  <link rel="stylesheet" href="/css/main.css">
+
 
 </head>
 
 <body>
 
-  <h2>Welcome</h2>
-  <h5>to</h5>
+  <div id="welcomeDiv">
+    <h2>Welcome</h2>
+    <h5>to</h5>
 
-  <img src="img/britishflag.png"/>
+    <img src="img/britishflag.png" class="img-responsive"/>
 
-  <h1>English Weekend</h1>
+    <h1>English Weekend</h1>
 
-  <h6>Share the next link to play</h6>
+    <button data-toggle="modal" data-target="#dialogTurn">Play</button>
 
-  <p id="linkToShare">link a la sala de juego</p>
+  </div>
+
+  <div id="contentGame" hidden>
+    Started ...
+  </div>
+
+  <div class="modal fade" tabindex="-1" role="dialog" id="dialogTurn">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <p style="color: black; margin-top:10px">Choose a deal&hellip;</p>
+
+        <img id="imgKiss" alt="dealKiss" onclick="sendDeal('kiss');"/>
+
+        <img id="imgSlap" alt="dealSlap" onclick="sendDeal('slap');"/>
+
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#modalRules">Rules</button>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="modal fade" tabindex="-1" role="dialog" id="modalRules">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <p style="color: black; margin-top:10px">Rules</p>
+        <p>
+          <ul>
+            <li>There is a hoster, who set one of two <b>deals</b>. For example <i>Kiss</i> and <i>Slap</i>.</li>
+            <li>Then share the link width a friend.</li>
+          </ul>
+        </p>
+        <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" tabindex="-1" role="dialog" id="modalWaitForDeal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <p style="color: black; margin-top:10px">Waiting for deal of other player&hellip;</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" tabindex="-1" role="dialog" id="dialogWait">
+    <div class="modal-dialog">
+      <div class="modal-content">
+
+        <p style="color: black; margin-top:10px">Share the next link to play</p>
+        <input type="text" id="linkToShare" class="selectText" style="color: black; margin-top:10px;" onClick="this.setSelectionRange(0, this.value.length)" />
+        <p style="color: black; margin-top:10px">Waiting for other player&hellip;</p>
+        <div class="modal-footer">
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/jquery.min.js"></script>
+  <script src="/js/bootstrap.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="js/jquery.min.js"></script>
-  <script src="js/bootstrap.min.js"></script>
+  <!--<script src="/js/accelerometer.js"></script>-->
+  <script src="dist/clipboard.min.js"></script>
+  <script type="text/javascript">
+
+    var token = window.location.pathname.substr(1);
+
+    var socket = io.connect();
+
+    if (token) {
+      socket.emit('join', token);
+    } else {
+      socket.emit('new');
+    }
+
+    socket.on('token', function(session) {
+       token = session;
+       document.getElementById('linkToShare').value = "https://english-week-elxris.c9users.io/" + token;
+
+    });
+
+    socket.on('status', function(status) {
+        switch (status) {
+          case 'initialized':
+              document.getElementById("welcomeDiv").style.visibility = "visible";
+              document.getElementById("contentGame").style.visibility = "hidden";
+            break;
+          case 'start':
+            // Inicia juego
+            alert("start game")
+              document.getElementById("welcomeDiv").style.visibility = "hidden";
+              document.getElementById("contentGame").style.visibility = "visible";
+              $("#dialogWait").modal('hide');
+              $("#dialogTurn").modal('hide');
+              $('#modalWaitForDeal').modal('hide')
+            break;
+          case 'waiting':
+            // mostrar mensaje de espera
+            $("#dialogWait").modal('hide');
+            $("#modalWaitForDeal").modal('show');
+            break;
+          case 'token':
+              // mostrar modal con token
+              $('#dialogWait').modal('show');
+              break;
+          case 'deal':
+              //mostrar modal de seleccionar deal
+              $('#dialogTurn').modal('show');
+              break;
+          case 'results':
+            // mostrar mensaje de espera
+            $("#dialogResults").modal('show');
+            break;
+          case '404':
+              document.getElementById("welcomeDiv").style.visibility = "visible";
+              document.getElementById("contentGame").style.visibility = "hidden";
+              getNewToken();
+            break;
+          default:
+            // la cagaste!
+        }
+    });
+
+    function getNewToken(){
+      socket.emit("new", true)
+    };
+
+    function sendDeal(deal) {
+      socket.emit('deal', deal)
+      $("#dialogTurn").modal('hide');
+    }
+
+    function movement(day, side) {
+      socket.emit("choice", [day, side]);
+    }
+
+    function replay() {
+      socket.emit('replay');
+    }
+
+    socket.on('message', function(message) {
+        alert(message);
+    });
+
+  </script>
 </body>
 
 </html>
